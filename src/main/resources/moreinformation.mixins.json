@@ -1,0 +1,18 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.dasien.moreinformation.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "moreinformation.refmap.json",
+  "mixins": [
+  ],
+  "client": [
+    "client.LevelRendererAccessor"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "overwrites": {
+    "requireAnnotations": true
+  }
+}
