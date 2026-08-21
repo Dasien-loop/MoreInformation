@@ -9,21 +9,19 @@ import com.dasien.moreinformation.mixin.client.LevelRendererAccessor;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.client.multiplayer.PlayerInfo;
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.client.event.RegisterGuiOverlaysEvent;
+import net.minecraftforge.client.event.RenderGuiOverlayEvent;
 import net.minecraftforge.client.gui.overlay.VanillaGuiOverlay;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.TickEvent;
@@ -61,6 +59,10 @@ public final class HudManager {
     private static int lastConfigHash;
     private static long nextFastTick;
     private static long nextSlowTick;
+    private static long lastPerfGameTime = Long.MIN_VALUE;
+    private static long lastPerfNanoTime;
+    private static boolean lastShiftDown;
+    private static HudLine perfLine = emptyLine(HudIcon.PERFORMANCE);
     private static HudLine playerLine = emptyLine(HudIcon.NETWORK);
     private static HudLine timeLine = emptyLine(HudIcon.TIME);
     private static HudLine worldLine = emptyLine(HudIcon.WORLD);
@@ -88,6 +90,22 @@ public final class HudManager {
     }
 
     @SubscribeEvent
+    public static void hideCompassOverlays(RenderGuiOverlayEvent.Pre event) {
+        if (!Config.integrationsEnabled) return;
+        ResourceLocation id = event.getOverlay().id();
+        String namespace = id.getNamespace();
+        String path = id.getPath();
+        if (Config.showNaturesCompass && (namespace.equals("naturescompass") || path.contains("natures_compass"))) {
+            event.setCanceled(true);
+            return;
+        }
+        if (Config.showExplorersCompass && (namespace.equals("explorerscompass") || namespace.equals("explorerscompassedited")
+                || path.contains("explorers_compass"))) {
+            event.setCanceled(true);
+        }
+    }
+
+    @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) {
             return;
@@ -110,6 +128,7 @@ public final class HudManager {
             providerErrorLogged.clear();
             nextFastTick = 0;
             nextSlowTick = 0;
+            lastPerfGameTime = Long.MIN_VALUE;
         }
 
         boolean changed = false;
@@ -142,6 +161,13 @@ public final class HudManager {
             changed = true;
         }
         changed |= updateBiomeIfNeeded(minecraft);
+        boolean shiftDown = Screen.hasShiftDown();
+        if (shiftDown != lastShiftDown) {
+            lastShiftDown = shiftDown;
+            providerNextTicks.clear();
+            updateProviders(minecraft);
+            changed = true;
+        }
         if (changed) {
             rebuildSnapshot();
         }
@@ -149,9 +175,11 @@ public final class HudManager {
 
     private static void updateFast(Minecraft minecraft) {
         BlockPos pos = minecraft.player.blockPosition();
+        if (Config.showPerformance) perfLine = hudLine(HudIcon.PERFORMANCE, buildPerformanceLine(minecraft));
         if (Config.showTime) timeLine = hudLine(HudIcon.TIME, buildTimeLine(minecraft.level));
         if (Config.showPosition) positionLine = hudLine(HudIcon.POSITION, buildPositionLine(minecraft.player, pos));
         if (Config.showLight) lightLine = hudLine(HudIcon.LIGHT, buildLightLine(minecraft.level, pos));
+        updateProviders(minecraft);
     }
 
     private static void updateSlow(Minecraft minecraft) {
@@ -162,12 +190,10 @@ public final class HudManager {
         if (Config.showWorld) worldLine = hudLine(HudIcon.WORLD, buildWorldLine(minecraft));
         if (Config.showEntities) {
             LevelRendererAccessor renderer = (LevelRendererAccessor) minecraft.levelRenderer;
-            entityLine = hudLine(HudIcon.ENTITIES, line("moreinformation.hud.entities")
-                    .append(value(String.valueOf(minecraft.level.getEntityCount()), ChatFormatting.YELLOW))
-                    .append(label("moreinformation.hud.entities.rendered"))
-                    .append(value(String.valueOf(renderer.moreinformation$getRenderedEntities()), ChatFormatting.GREEN)));
+             entityLine = hudLine(HudIcon.ENTITIES, HudTemplate.apply(template(Config.entitiesTemplate, "moreinformation.hud.template.entities"), Map.of(
+                    "entities", token(String.valueOf(minecraft.level.getEntityCount()), ChatFormatting.YELLOW),
+                    "rendered", token(String.valueOf(renderer.moreinformation$getRenderedEntities()), ChatFormatting.GREEN))));
         }
-        updateProviders(minecraft);
     }
 
     private static boolean updateBiomeIfNeeded(Minecraft minecraft) {
@@ -226,8 +252,9 @@ public final class HudManager {
     }
 
     private static void rebuildSnapshot() {
-        List<HudLine> lines = new ArrayList<>(7 + providerLines.size());
+        List<HudLine> lines = new ArrayList<>(8 + providerLines.size());
         if (Config.hudEnabled) {
+            if (Config.showPerformance) lines.add(perfLine);
             if (Config.showPlayer) lines.add(playerLine);
             if (Config.showTime) lines.add(timeLine);
             if (Config.showWorld) lines.add(worldLine);
@@ -240,13 +267,61 @@ public final class HudManager {
         snapshot = new HudSnapshot(lines);
     }
 
+    private static Component buildPerformanceLine(Minecraft minecraft) {
+        float mspt = sampleMspt(minecraft);
+        float tps = HudMath.tpsFromMspt(mspt);
+        Runtime runtime = Runtime.getRuntime();
+        long used = runtime.totalMemory() - runtime.freeMemory();
+        long max = runtime.maxMemory();
+        return HudTemplate.apply(template(Config.performanceTemplate, "moreinformation.hud.template.performance"), Map.of(
+                "tps", token(HudMath.formatOneDecimal(tps), tpsColor(tps)),
+                "mspt", token(HudMath.formatOneDecimal(mspt), msptColor(mspt)),
+                "ram", token(HudMath.formatRam(used, max), ramColor(used, max))));
+    }
+
+    private static float sampleMspt(Minecraft minecraft) {
+        net.minecraft.client.server.IntegratedServer server = minecraft.getSingleplayerServer();
+        if (server != null) {
+            return server.getAverageTickTime();
+        }
+        long gameTime = minecraft.level.getGameTime();
+        long now = System.nanoTime();
+        float mspt = 50.0F;
+        if (lastPerfGameTime != Long.MIN_VALUE) {
+            float estimated = HudMath.estimateMspt(gameTime - lastPerfGameTime, now - lastPerfNanoTime);
+            if (estimated > 0.0F) {
+                mspt = estimated;
+            }
+        }
+        lastPerfGameTime = gameTime;
+        lastPerfNanoTime = now;
+        return mspt;
+    }
+
+    private static ChatFormatting tpsColor(float tps) {
+        if (tps >= 19.5F) return ChatFormatting.GREEN;
+        if (tps >= 15.0F) return ChatFormatting.YELLOW;
+        return ChatFormatting.RED;
+    }
+
+    private static ChatFormatting msptColor(float mspt) {
+        if (mspt <= 50.0F) return ChatFormatting.GREEN;
+        if (mspt <= 66.0F) return ChatFormatting.YELLOW;
+        return ChatFormatting.RED;
+    }
+
+    private static ChatFormatting ramColor(long used, long max) {
+        float percent = HudMath.percent(used, max);
+        if (percent < 70.0F) return ChatFormatting.GREEN;
+        if (percent < 90.0F) return ChatFormatting.YELLOW;
+        return ChatFormatting.RED;
+    }
+
     private static Component buildPlayerLine(Minecraft minecraft) {
-        return line("moreinformation.hud.player")
-                .append(value(minecraft.getUser().getName(), ChatFormatting.GREEN))
-                .append(label("moreinformation.hud.fps"))
-                .append(value(String.valueOf(minecraft.getFps()), ChatFormatting.YELLOW))
-                .append(label("moreinformation.hud.session"))
-                .append(value(HudMath.formatClock(Instant.now(), Config.clockTimeZone), ChatFormatting.YELLOW));
+        return HudTemplate.apply(template(Config.playerTemplate, "moreinformation.hud.template.player"), Map.of(
+                "player", token(minecraft.getUser().getName(), ChatFormatting.GREEN),
+                "fps", token(String.valueOf(minecraft.getFps()), ChatFormatting.YELLOW),
+                "clock", token(HudMath.formatClock(Instant.now(), Config.clockTimeZone), ChatFormatting.YELLOW)));
     }
 
     private static Component buildTimeLine(Level level) {
@@ -254,67 +329,52 @@ public final class HudManager {
         long dayTicks = Math.floorMod(level.getDayTime(), 24000L);
         long minutes = Math.floorMod(dayTicks + 6000L, 24000L) * 60L / 1000L;
         String time = String.format(Locale.ROOT, "%02d:%02d", minutes / 60L, minutes % 60L);
-        return line("moreinformation.hud.date")
-                .append(value(String.valueOf(day / 365L + 1L), ChatFormatting.YELLOW))
-                .append(label("moreinformation.hud.year"))
-                .append(value(String.valueOf(day % 365L), ChatFormatting.YELLOW))
-                .append(label("moreinformation.hud.day"))
-                .append(label("moreinformation.hud.time"))
-                .append(value(time, ChatFormatting.YELLOW))
-                .append(value(dayTicks < 12000L ? " " + Component.translatable("moreinformation.hud.daytime").getString() : " " + Component.translatable("moreinformation.hud.night").getString(), ChatFormatting.GREEN));
+        String period = Component.translatable(dayTicks < 12000L ? "moreinformation.hud.daytime" : "moreinformation.hud.night").getString();
+        return HudTemplate.apply(template(Config.timeTemplate, "moreinformation.hud.template.time"), Map.of(
+                "year", token(String.valueOf(HudMath.year(day)), ChatFormatting.YELLOW),
+                "day", token(String.valueOf(HudMath.dayOfYear(day)), ChatFormatting.YELLOW),
+                "time", token(time, ChatFormatting.YELLOW),
+                "period", token(period, ChatFormatting.GREEN)));
     }
 
     private static Component buildWorldLine(Minecraft minecraft) {
         Level level = minecraft.level;
         String dimension = translated(level.dimension().location(), "dimension");
-        return line("moreinformation.hud.world")
-                .append(value(dimension, ChatFormatting.AQUA))
-                .append(label("moreinformation.hud.chunks"))
-                .append(value(String.valueOf(level.getChunkSource().getLoadedChunksCount()), ChatFormatting.YELLOW));
+        return HudTemplate.apply(template(Config.worldTemplate, "moreinformation.hud.template.world"), Map.of(
+                "world", token(dimension, ChatFormatting.AQUA),
+                "chunks", token(String.valueOf(level.getChunkSource().getLoadedChunksCount()), ChatFormatting.YELLOW)));
     }
 
     private static Component buildBiomeLine(Minecraft minecraft, BlockPos pos, ResourceLocation biomeId) {
         Level level = minecraft.level;
-        Component weather = Component.translatable(level.isThundering()
+        String weather = Component.translatable(level.isThundering()
                 ? "moreinformation.hud.weather.thunder"
-                : level.isRaining() ? "moreinformation.hud.weather.rain" : "moreinformation.hud.weather.clear");
-        MutableComponent result = Component.empty();
-        if (Config.showBiome) {
-            result.append(line("moreinformation.hud.biome"))
-                    .append(value(biomeId == null ? "?" : translated(biomeId, "biome"), ChatFormatting.AQUA));
-        }
-        if (Config.showWeather) {
-            result.append(label("moreinformation.hud.weather"))
-                    .append(weather.copy().withStyle(ChatFormatting.AQUA));
-        }
-        return result;
+                : level.isRaining() ? "moreinformation.hud.weather.rain" : "moreinformation.hud.weather.clear").getString();
+        String defaultKey = Config.showBiome && Config.showWeather
+                ? "moreinformation.hud.template.biome_weather"
+                : Config.showBiome ? "moreinformation.hud.template.biome" : "moreinformation.hud.template.weather";
+        return HudTemplate.apply(template(Config.biomeTemplate, defaultKey), Map.of(
+                "biome", token(biomeId == null ? "?" : translated(biomeId, "biome"), ChatFormatting.AQUA),
+                "weather", token(weather, ChatFormatting.AQUA)));
     }
 
     private static Component buildPositionLine(net.minecraft.client.player.LocalPlayer player, BlockPos pos) {
         ChunkPos chunk = new ChunkPos(pos);
-        return line("moreinformation.hud.position")
-                .append(label("moreinformation.hud.block"))
-                .append(value(pos.getX() + " " + pos.getY() + " " + pos.getZ(), ChatFormatting.YELLOW))
-                .append(label("moreinformation.hud.chunk"))
-                .append(value(chunk.x + " " + chunk.z, ChatFormatting.YELLOW))
-                .append(label("moreinformation.hud.offset"))
-                .append(value(Math.floorMod(pos.getX(), 16) + " " + Math.floorMod(pos.getY(), 16) + " " + Math.floorMod(pos.getZ(), 16), ChatFormatting.YELLOW))
-                .append(label("moreinformation.hud.facing"))
-                .append(value(Component.translatable("moreinformation.hud.direction." + player.getDirection().getName()).getString(), ChatFormatting.GREEN));
+        return HudTemplate.apply(template(Config.positionTemplate, "moreinformation.hud.template.position"), Map.of(
+                "block", token(pos.getX() + " " + pos.getY() + " " + pos.getZ(), ChatFormatting.YELLOW),
+                "chunk", token(chunk.x + " " + chunk.z, ChatFormatting.YELLOW),
+                "offset", token(Math.floorMod(pos.getX(), 16) + " " + Math.floorMod(pos.getY(), 16) + " " + Math.floorMod(pos.getZ(), 16), ChatFormatting.YELLOW),
+                "facing", token(Component.translatable("moreinformation.hud.direction." + player.getDirection().getName()).getString(), ChatFormatting.GREEN)));
     }
 
     private static Component buildLightLine(Level level, BlockPos pos) {
         int sky = level.getBrightness(LightLayer.SKY, pos);
         int block = level.getBrightness(LightLayer.BLOCK, pos);
         int combined = level.getChunkSource().getLightEngine().getRawBrightness(pos, 0);
-        return line("moreinformation.hud.light")
-                .append(value(String.valueOf(combined), ChatFormatting.YELLOW))
-                .append(label("moreinformation.hud.light.details"))
-                .append(label("moreinformation.hud.light.sky"))
-                .append(value(String.valueOf(sky), ChatFormatting.YELLOW))
-                .append(label("moreinformation.hud.light.block"))
-                .append(value(String.valueOf(block), ChatFormatting.YELLOW))
-                .append(label("moreinformation.hud.light.close"));
+        return HudTemplate.apply(template(Config.lightTemplate, "moreinformation.hud.template.light"), Map.of(
+                "light", token(String.valueOf(combined), ChatFormatting.YELLOW),
+                "sky", token(String.valueOf(sky), ChatFormatting.YELLOW),
+                "block", token(String.valueOf(block), ChatFormatting.YELLOW)));
     }
 
     private static String translated(ResourceLocation id, String type) {
@@ -322,8 +382,12 @@ public final class HudManager {
         return I18n.exists(key) ? Component.translatable(key).getString() : id.toString();
     }
 
-    private static MutableComponent line(String key) {
-        return label(key);
+    private static String template(String configured, String defaultKey) {
+        return configured == null || configured.isBlank() ? I18n.get(defaultKey) : configured;
+    }
+
+    private static HudTemplate.Token token(String text, ChatFormatting color) {
+        return new HudTemplate.Token(text, color);
     }
 
     private static HudLine emptyLine(HudIcon icon) {
@@ -346,19 +410,14 @@ public final class HudManager {
         return components.stream().map(component -> new HudLine(component, null, snapshotIcon, -1)).toList();
     }
 
-    private static MutableComponent label(String key) {
-        return Component.translatable(key).withStyle(ChatFormatting.WHITE);
-    }
-
-    private static MutableComponent value(String text, ChatFormatting color) {
-        return Component.literal(text).withStyle(color);
-    }
-
     private static int configHash() {
-        return Objects.hash(Config.hudEnabled, Config.showPlayer, Config.showTime, Config.showWorld,
+        return Objects.hash(Config.hudEnabled, Config.hudPosition, Config.hudOffsetX, Config.hudOffsetY, Config.showPerformance, Config.showPlayer, Config.showTime, Config.showWorld,
                 Config.showBiome, Config.showWeather, Config.showEntities, Config.showPosition, Config.showLight,
+                Config.performanceTemplate, Config.playerTemplate, Config.timeTemplate, Config.worldTemplate,
+                Config.biomeTemplate, Config.entitiesTemplate, Config.positionTemplate, Config.lightTemplate,
                 Config.integrationsEnabled, Config.showEclipticSeasons, Config.showBloodMagic,
-                Config.showTerraFirmaCraft, Config.showL2Hostility, Config.clockTimeZone, Config.enabledProviders);
+                Config.showTerraFirmaCraft, Config.showL2Hostility, Config.showProjectE,
+                Config.showNaturesCompass, Config.showExplorersCompass, Config.showNaturesAura, Config.clockTimeZone);
     }
 
     private static void resetWorldState() {
@@ -367,6 +426,8 @@ public final class HudManager {
         lastBiomeId = null;
         lastRaining = false;
         lastThundering = false;
+        lastPerfGameTime = Long.MIN_VALUE;
+        lastShiftDown = false;
         providerNextTicks.clear();
         providerLineCache.clear();
         providerErrorLogged.clear();
@@ -379,10 +440,18 @@ public final class HudManager {
             return;
         }
         gui.setupOverlayRenderState(false, false);
-        int y = START_Y;
-        for (HudLine line : snapshot.lines()) {
-            renderIcon(minecraft, graphics, line.icon(), line.customIcon(), line.iconLevel(), START_X, y);
-            graphics.drawString(minecraft.font, line.text(), START_X + 14, y, WHITE, true);
+        List<HudLine> lines = snapshot.lines();
+        int contentWidth = 14;
+        for (HudLine line : lines) {
+            contentWidth = Math.max(contentWidth, 14 + minecraft.font.width(line.text()));
+        }
+        int contentHeight = lines.size() * LINE_HEIGHT;
+        boolean right = HudMath.hudRight(Config.hudPosition);
+        int x = HudMath.placedX(HudMath.anchorX(right, screenWidth, contentWidth, START_X), Config.hudOffsetX, screenWidth, contentWidth);
+        int y = HudMath.placedY(HudMath.anchorY(HudMath.hudVertical(Config.hudPosition), screenHeight, contentHeight, START_Y), Config.hudOffsetY, screenHeight, contentHeight);
+        for (HudLine line : lines) {
+            renderIcon(minecraft, graphics, line.icon(), line.customIcon(), line.iconLevel(), x, y);
+            graphics.drawString(minecraft.font, line.text(), x + 14, y, WHITE, true);
             y += LINE_HEIGHT;
         }
     }

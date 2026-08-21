@@ -5,6 +5,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
 
 enum HudIcon {
+    PERFORMANCE(new ItemStack(Items.REPEATER)),
     NETWORK(null),
     TIME(new ItemStack(Items.CLOCK)),
     WORLD(new ItemStack(Blocks.GRASS_BLOCK.asItem())),
