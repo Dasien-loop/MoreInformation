@@ -100,7 +100,7 @@ public final class HudManager {
             return;
         }
         if (Config.showExplorersCompass && (namespace.equals("explorerscompass") || namespace.equals("explorerscompassedited")
-                || path.contains("explorers_compass"))) {
+                || path.contains("explorers_compass") || path.contains("explorerscompass"))) {
             event.setCanceled(true);
         }
     }
