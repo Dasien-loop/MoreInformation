@@ -10,6 +10,8 @@ import java.time.format.DateTimeFormatter;
 
 /** Pure formatting helpers kept separate for cheap unit testing. */
 public final class HudMath {
+    private static final long DAYS_PER_YEAR = 365L;
+
     private static final DateTimeFormatter CLOCK_FORMAT = DateTimeFormatter.ofPattern("HH:mm:ss", Locale.ROOT);
     private static final String[] BIG_UNITS = {
             "", "K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No", "Dc"
@@ -28,12 +30,14 @@ public final class HudMath {
         return CLOCK_FORMAT.withZone(ZoneId.of(zoneId)).format(instant);
     }
 
+    /** Maps a zero-based elapsed Minecraft day to the displayed zero-based year. */
     public static long year(long day) {
-        return Math.floorDiv(day, 365L) + 1L;
+        return Math.floorDiv(day, DAYS_PER_YEAR);
     }
 
+    /** Maps a zero-based elapsed Minecraft day to the displayed one-based day of year. */
     public static long dayOfYear(long day) {
-        return Math.floorMod(day, 365L);
+        return Math.floorMod(day, DAYS_PER_YEAR) + 1L;
     }
 
     public static String formatEmc(BigInteger value, boolean compact) {
