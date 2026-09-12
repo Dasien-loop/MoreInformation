@@ -1,6 +1,8 @@
 # MoreInformation
 
-Calendar dates match main: a new world starts at year 0, day 0. Each 24,000 DayTime ticks advances the date; sleeping follows vanilla DayTime.
+Calendar dates never rewind: setting an earlier time of day advances to tomorrow; a later or equal time stays on the same day. Natural rollover, sleep and multi-day additions advance the date.
+
+Client-local records in `moreinformation/calendars/` are isolated by save or server address and dimension, even while the HUD is disabled. Initial dates come from world time; earlier or offline time-reset history cannot be reconstructed. Replacing a server world at the same address does not automatically reset its local record.
 
 A client-side information HUD for Minecraft 1.21.1 NeoForge, version 1.0.2. By default it shows TPS / MSPT / RAM and player info. Extra lines and mod integrations can be enabled in the config.
 

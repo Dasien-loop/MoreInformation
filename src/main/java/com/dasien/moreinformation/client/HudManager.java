@@ -445,7 +445,7 @@ public final class HudManager {
     }
 
     private static Component buildTimeLine(Level level) {
-        long day = Math.floorDiv(level.getDayTime(), 24000L);
+        long day = ClientCalendar.day(level);
         long dayTicks = Math.floorMod(level.getDayTime(), 24000L);
         long minutes = Math.floorMod(dayTicks + 6000L, 24000L) * 60L / 1000L;
         String time = String.format(Locale.ROOT, "%02d:%02d", minutes / 60L, minutes % 60L);
@@ -570,6 +570,7 @@ public final class HudManager {
     }
 
     private static void resetWorldState() {
+        ClientCalendar.disconnect();
         lastWorld = null;
         lastBiomePos = null;
         lastBiomeId = null;
