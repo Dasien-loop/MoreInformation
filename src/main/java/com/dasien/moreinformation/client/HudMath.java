@@ -26,6 +26,28 @@ public final class HudMath {
         return String.format(Locale.ROOT, "%02d:%02d", safeSeconds / 60L, safeSeconds % 60L);
     }
 
+    /** Formats a status effect duration; a negative tick count means the effect never expires. */
+    public static String formatEffectDuration(int ticks) {
+        return ticks < 0 ? "∞" : formatDuration(ticks / 20L);
+    }
+
+    /** Status effect icons follow the HUD scale but keep their own multiplier. */
+    public static float effectIconScale(double configured) {
+        if (!(configured > 0.0D)) {
+            return 1.0F;
+        }
+        return (float) Math.max(0.5D, Math.min(3.0D, configured));
+    }
+
+    /** Scales one coordinate the way a nether portal does: 8 divides, -8 multiplies. */
+    public static int portalCoordinate(int coordinate, int factor) {
+        return factor < 0 ? coordinate * -factor : Math.floorDiv(coordinate, factor);
+    }
+
+    public static String portalCoordinates(int x, int y, int z, int factor) {
+        return portalCoordinate(x, factor) + " " + y + " " + portalCoordinate(z, factor);
+    }
+
     public static String formatClock(Instant instant, String zoneId) {
         return CLOCK_FORMAT.withZone(ZoneId.of(zoneId)).format(instant);
     }
@@ -35,9 +57,9 @@ public final class HudMath {
         return Math.floorDiv(day, DAYS_PER_YEAR);
     }
 
-    /** Maps a zero-based elapsed Minecraft day to the displayed one-based day of year. */
+    /** Maps a zero-based elapsed Minecraft day to the displayed zero-based day of year. */
     public static long dayOfYear(long day) {
-        return Math.floorMod(day, DAYS_PER_YEAR) + 1L;
+        return Math.floorMod(day, DAYS_PER_YEAR);
     }
 
     public static String formatEmc(BigInteger value, boolean compact) {
@@ -150,12 +172,53 @@ public final class HudMath {
         return padding;
     }
 
+    public static float hudScale(double scale) {
+        if (!Double.isFinite(scale) || scale <= 0.0D) {
+            return 1.0F;
+        }
+        return (float) Math.max(0.25D, Math.min(4.0D, scale));
+    }
+
+    public static int scaledSize(int size, float scale) {
+        if (scale <= 0.0F) return Math.max(0, size);
+        return Math.max(0, Math.round(size * scale));
+    }
+
     public static int placedX(int baseX, int offsetX, int screenWidth, int contentWidth) {
         return clamp(baseX + offsetX, 0, Math.max(0, screenWidth - contentWidth));
     }
 
     public static int placedY(int baseY, int offsetY, int screenHeight, int contentHeight) {
         return clamp(baseY + offsetY, 0, Math.max(0, screenHeight - contentHeight));
+    }
+
+    public static float fitScale(double configured, int width, int height, int screenWidth, int screenHeight) {
+        float scale = hudScale(configured);
+        scale = Math.min(scale, Math.max(1, screenWidth) / (float) Math.max(1, width));
+        return Math.min(scale, Math.max(1, screenHeight) / (float) Math.max(1, height));
+    }
+
+    public static int effectRowHeight(int iconHeight, int textHeight, int gap) {
+        return Math.max(iconHeight, 2 * textHeight) + gap;
+    }
+
+    public static EffectLayout effectLayout(int count, int availableWidth, int iconWidth, int rowHeight) {
+        if (count <= 0) return new EffectLayout(1, 0, 0, 0, 0, 0);
+        int width = Math.max(1, Math.min(360, availableWidth));
+        int slotWidth = Math.min(iconWidth + 82, Math.max(1, width - 36));
+        int columns = Math.max(1, Math.min(3, (width - 36 + 8) / (slotWidth + 8)));
+        int visible = Math.min(count, columns * 2);
+        int rows = (visible + columns - 1) / columns;
+        int usedColumns = Math.min(visible, columns);
+        int contentWidth = usedColumns * (slotWidth + 8) - 8 + (count > visible ? 36 : 0);
+        return new EffectLayout(columns, visible, count - visible, slotWidth, contentWidth, rows * rowHeight);
+    }
+
+    public record EffectLayout(int columns, int visible, int hidden, int slotWidth, int width, int height) {}
+
+    /** Two full rows plus overflow space, independent of the active effect count. */
+    public static EffectLayout reservedEffectLayout(boolean enabled, int availableWidth, int iconWidth, int rowHeight) {
+        return effectLayout(enabled ? 7 : 0, availableWidth, iconWidth, rowHeight);
     }
 
     static int clamp(int value, int min, int max) {

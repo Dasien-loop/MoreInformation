@@ -12,7 +12,9 @@ enum HudIcon {
     BIOME(new ItemStack(Items.OAK_LEAVES)),
     ENTITIES(new ItemStack(Items.REDSTONE)),
     POSITION(new ItemStack(Items.COMPASS)),
-    LIGHT(new ItemStack(Items.TORCH));
+    LIGHT(new ItemStack(Items.TORCH)),
+    MOON(new ItemStack(Items.PHANTOM_MEMBRANE)),
+    HOSTILE(new ItemStack(Items.IRON_SWORD));
 
     private final ItemStack stack;
 
