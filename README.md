@@ -1,6 +1,6 @@
 # MoreInformation
 
-Minecraft 1.21.1 NeoForge 客户端信息 HUD，当前版本 1.0.2。默认显示 TPS / MSPT / RAM 和玩家信息，其余行和模组兼容可在配置里打开。
+Minecraft 1.21.1 NeoForge 客户端信息 HUD，当前版本 1.0.3。默认显示 TPS / MSPT / RAM 和玩家信息，其余行和模组兼容可在配置里打开。
 
 [English](README_EN.md)
 
@@ -42,6 +42,8 @@ Minecraft 1.21.1 NeoForge 客户端信息 HUD，当前版本 1.0.2。默认显�
 - 开启状态效果显示后，固定预留两行药水区和溢出提示空间；没有效果或打开容器时仍保留，信息位置不随效果增减跳动。关闭 `hud.showEffects` 后取消预留。
 - 默认图标倍率下预留高度为 44 个 HUD 逻辑像素，随整体缩放变化；调整 `hud.effectsIconScale` 时预留高度同步调整。
 - 关闭 HUD 或打开调试界面时，不会继续隐藏原版效果图标。
+- 接管状态效果时，不只取消原版绘制：本地玩家效果的客户端 `showIcon()` 查询也返回不可见，使 Xaero 等根据图标可见性计算避让的模组不再为隐藏图标预留空间；不再使用 Xaero 专用补丁。关闭接管、F3、F1 或打开容器时立即恢复原始可见性。
+- 不移除药水效果、不修改其原始图标标记、粒子或其他实体；原版存档和网络序列化保留原值。本 HUD 自身的固定药水区不变。直接按效果列表数量（忽略图标可见性）避让的模组仍可能需要单独适配。
 - 实体模板支持 `{entities}`、`{hostile}`、`{rendered}`；时间模板支持 `{year}`、`{day}`、`{time}`、`{period}`、`{phase}`。
 
 ## 模组兼容
@@ -58,8 +60,11 @@ Minecraft 1.21.1 NeoForge 客户端信息 HUD，当前版本 1.0.2。默认显�
 | 探险家指南针 Explorer's Compass | `showExplorersCompass` | 搜索结构时显示状态，并隐藏原 Overlay |
 | 探险家指南针修改版 ExplorersCompassEdited | `showExplorersCompass` | 同上 |
 | 自然灵气 Nature's Aura | `showNaturesAura` | 当前位置周围的灵气强度（与灵气目镜同一算法） |
+| Neo Vitae（1.21.1 血魔法重制） | `showNeoVitae` | 个人生命源质 EV（约数） |
 
 自然指南针和探险家指南针默认开启；其余兼容默认关闭。总开关为 `integrations.enabled`。
+
+Neo Vitae 接口按 `1.21.1-1.1.51` 核对，仅读取客户端同步的 Anima 缓存。使用命血祭坛图标，显示 `数值 EV`（不带约等号）：宿主每 60 tick 检查一次，按 500 EV 取整，首次同步前不显示；相同 UUID 重连时可能短暂显示宿主残留缓存。不会读取服务端存档、额外请求同步，也不把血球容量/等级当作玩家网络上限。
 
 其他模组通过 `HudInfoRegistry` 注册的信息默认显示，无需额外填写 provider id；仍受 `integrations.enabled` 总开关控制。
 

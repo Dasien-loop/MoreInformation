@@ -5,7 +5,10 @@
   "compatibilityLevel": "JAVA_21",
   "client": [
     "client.LevelRendererAccessor",
-    "client.ClientTimeMixin"
+    "client.ClientTimeMixin",
+    "client.MobEffectIconMixin",
+    "client.MobEffectIconAccessor",
+    "client.MobEffectPacketMixin"
   ],
   "injectors": {
     "defaultRequire": 1

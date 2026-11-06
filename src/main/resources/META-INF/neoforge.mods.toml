@@ -82,3 +82,10 @@ type="optional"
 versionRange="[0,)"
 ordering="NONE"
 side="CLIENT"
+
+[[dependencies.${mod_id}]]
+modId="neovitae"
+type="optional"
+versionRange="[0,)"
+ordering="NONE"
+side="CLIENT"

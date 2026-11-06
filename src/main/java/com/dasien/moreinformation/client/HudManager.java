@@ -118,7 +118,7 @@ public final class HudManager {
         if (!Config.hudEnabled || minecraft.options.hideGui || minecraft.getDebugOverlay().showDebugScreen()) return;
         // The vanilla effect list is the only place it stays visible while a container screen is open,
         // so this overlay keeps rendering there and the player never loses their potion timers.
-        if (Config.showEffects && !containerScreenOpen() && isPotionIcons(event.getName())) {
+        if (VanillaEffectsVisibility.shouldHide() && isPotionIcons(event.getName())) {
             event.setCanceled(true);
             return;
         }
@@ -566,7 +566,7 @@ public final class HudManager {
                 Config.moonTemplate, Config.hostileTemplate,
                 Config.integrationsEnabled, Config.showEclipticSeasons,
                 Config.showTerraFirmaCraft, Config.showL2Hostility, Config.showProjectE,
-                Config.showNaturesCompass, Config.showExplorersCompass, Config.showNaturesAura, Config.clockTimeZone);
+                Config.showNaturesCompass, Config.showExplorersCompass, Config.showNaturesAura, Config.showNeoVitae, Config.clockTimeZone);
     }
 
     private static void resetWorldState() {

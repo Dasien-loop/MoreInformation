@@ -3,6 +3,7 @@ package com.dasien.moreinformation.client;
 import com.dasien.moreinformation.api.HudContext;
 import com.dasien.moreinformation.api.HudInfoProvider;
 import com.dasien.moreinformation.api.HudInfoRegistry;
+import com.dasien.moreinformation.client.compat.neovitae.NeoVitaeProvider;
 import net.minecraft.ChatFormatting;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
@@ -47,6 +48,7 @@ final class CompatProviders {
         HudInfoRegistry.register(new L2HostilityProvider());
         HudInfoRegistry.register(new ProjectEProvider());
         HudInfoRegistry.register(new NaturesAuraProvider());
+        HudInfoRegistry.register(new NeoVitaeProvider());
         HudInfoRegistry.register(new CompassSearchProvider(
                 "naturescompass", "search", 200,
                 List.of("naturescompass"),

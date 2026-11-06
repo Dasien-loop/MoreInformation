@@ -1,3 +1,14 @@
+# MoreInformation 1.0.3
+
+Minecraft 1.21.1 / NeoForge
+
+- 将药水隐藏改为通用客户端图标可见性处理，替换 Xaero 专用补丁：按 `showIcon()` 避让的模组不再为隐藏图标预留空间。仅作用于本地玩家的实际效果实例；关闭接管、F3、F1 和容器界面恢复原行为。原始图标标记、效果数据及原版存档/网络序列化不变。
+- 添加可选 Neo Vitae 1.21.1 联动：`integrations.showNeoVitae`（默认关闭），使用命血祭坛图标，显示客户端同步的个人生命源质 `… EV`，不带约等号；宿主取整和同步频率不变。
+- 统一药水可见性判断，增加可见性组合、Neo Vitae 同步数据及缺失接口的回归测试。
+- Replace the Xaero-specific patch with a client-side icon visibility view for the local player's effects. Mods respecting showIcon() no longer reserve space for hidden icons. Restore original visibility when replacement is inactive, in F3/F1 and in containers; preserve raw flags and vanilla save/network serialization.
+- Add optional Neo Vitae 1.21.1 integration via `integrations.showNeoVitae` (off by default), using the Ara Vitae altar icon and displaying client-synchronized personal EV without an approximation prefix; host rounding and synchronization are unchanged.
+- Add visibility and optional client-cache regression tests.
+
 # MoreInformation 1.0.2
 
 Minecraft 1.21.1 / NeoForge

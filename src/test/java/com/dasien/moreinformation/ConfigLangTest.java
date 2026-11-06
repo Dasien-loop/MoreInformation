@@ -25,6 +25,13 @@ class ConfigLangTest {
                     org.junit.jupiter.api.Assertions.assertTrue(values.has(key), key);
                     org.junit.jupiter.api.Assertions.assertFalse(values.get(key).getAsString().isBlank());
                 }
+                for (String key : new String[]{"moreinformation.integration.neovitae",
+                        "moreinformation.config.integrations.showNeoVitae"}) {
+                    org.junit.jupiter.api.Assertions.assertTrue(values.has(key), key);
+                    org.junit.jupiter.api.Assertions.assertFalse(values.get(key).getAsString().isBlank());
+                }
+                org.junit.jupiter.api.Assertions.assertTrue(values.get(
+                        "moreinformation.config.integrations.showNeoVitae").getAsString().contains("500"));
                 String template = values.get("moreinformation.hud.template.entities").getAsString();
                 org.junit.jupiter.api.Assertions.assertTrue(template.indexOf("{entities}") < template.indexOf("{hostile}"));
                 org.junit.jupiter.api.Assertions.assertTrue(template.indexOf("{hostile}") < template.indexOf("{rendered}"));

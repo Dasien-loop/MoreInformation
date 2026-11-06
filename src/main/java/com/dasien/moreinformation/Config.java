@@ -51,6 +51,7 @@ public final class Config {
     private static final ModConfigSpec.BooleanValue SHOW_NATURES_COMPASS;
     private static final ModConfigSpec.BooleanValue SHOW_EXPLORERS_COMPASS;
     private static final ModConfigSpec.BooleanValue SHOW_NATURES_AURA;
+    private static final ModConfigSpec.BooleanValue SHOW_NEO_VITAE;
 
     static {
         BUILDER.comment(comment("hud")).translation("moreinformation.config.hud").push("hud");
@@ -103,6 +104,7 @@ public final class Config {
         SHOW_NATURES_COMPASS = value("integrations.showNaturesCompass", "showNaturesCompass", true);
         SHOW_EXPLORERS_COMPASS = value("integrations.showExplorersCompass", "showExplorersCompass", true);
         SHOW_NATURES_AURA = value("integrations.showNaturesAura", "showNaturesAura", false);
+        SHOW_NEO_VITAE = value("integrations.showNeoVitae", "showNeoVitae", false);
         BUILDER.pop();
     }
 
@@ -145,6 +147,7 @@ public final class Config {
     public static volatile boolean showNaturesCompass = true;
     public static volatile boolean showExplorersCompass = true;
     public static volatile boolean showNaturesAura = false;
+    public static volatile boolean showNeoVitae = false;
 
     private Config() {
     }
@@ -190,6 +193,7 @@ public final class Config {
         showNaturesCompass = SHOW_NATURES_COMPASS.get();
         showExplorersCompass = SHOW_EXPLORERS_COMPASS.get();
         showNaturesAura = SHOW_NATURES_AURA.get();
+        showNeoVitae = SHOW_NEO_VITAE.get();
     }
 
     public static boolean isProviderEnabled(ResourceLocation id) {
@@ -201,6 +205,7 @@ public final class Config {
             case "naturescompass:search" -> showNaturesCompass;
             case "explorerscompass:search" -> showExplorersCompass;
             case "naturesaura:aura" -> showNaturesAura;
+            case "neovitae:anima" -> showNeoVitae;
             default -> true;
         };
     }
